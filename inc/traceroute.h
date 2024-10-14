@@ -14,14 +14,26 @@
 #include <netinet/ip_icmp.h>
 #include <time.h>
 
+#define PING_PKT_S 64
+
+typedef struct s_ping_pkt
+{
+    struct icmphdr hdr;
+    char msg[PING_PKT_S - sizeof(struct icmphdr)];
+}t_ping_pkt;
+
 typedef struct s_data
 {
-    struct sockaddr_in addr_con;
+    struct sockaddr_in ping_addr;
     char domain[500];
     char ip[1025];
     int ttl;
-    unsigned int hope;
-    unsigned int queries;
+    int hope;
+    int queries;
+    int sockfd;
+    t_ping_pkt pckt;
+    int sequence;
+    int id;
 } t_data;
 
 /* error.c */
