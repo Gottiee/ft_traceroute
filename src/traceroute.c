@@ -108,50 +108,66 @@ void setup_socket(t_data *data, int ttl)
         fatal_perror("Error: setup timeout socket");
 }
 
-// bool receive_ping(t_data *data)
-// {
-//     char rbuffer[128];
-//     recvfrom(data->sockfd, rbuffer, sizeof(rbuffer), 0, NULL, NULL);
-//     if (data->size_recv <= 0)
-//         return false;
-    
-//     struct icmphdr *recv_hdr = (struct icmphdr *)(rbuffer + sizeof(struct iphdr));
-//     if (recv_hdr->un.echo.id == 0)
-//     {
-//         data->error_ip = (struct iphdr *)(rbuffer + sizeof(struct icmphdr) + sizeof(struct iphdr));
-//         data->error_icmp = (struct icmphdr *)(rbuffer + sizeof(struct icmphdr) + sizeof(struct iphdr) + (send_data.error_ip->ihl * 4));
-//         if (!analyse_error())
-//             return false;
-//     }
-//     else if (recv_hdr->un.echo.id != data->id || recv_hdr->type == 8)
-//         return false;
-//     data->sequence = htons(recv_hdr->un.echo.sequence);
-//     if (!(recv_hdr->type == 0 && recv_hdr->code == 0))
-//     {
-//         print_error_code(recv_hdr->type, recv_hdr->code);
-//         return false;
-//     }
-//     struct iphdr *recv_ip = (struct iphdr *)rbuffer;
-//     data->return_ttl = recv_ip->ttl;
-//     data->msg_receive++;
-//     return true;
-// }
+bool analyse_error(struct icmphdr *error_icmp, t_data *data)
+{
+    if (error_icmp->un.echo.id != data->id)
+        return false;
+    return true;
+}
+
+char *receive_ping(t_data *data, bool *finish)
+{
+    char rbuffer[128];
+
+    if (recvfrom(data->sockfd, rbuffer, sizeof(rbuffer), 0, NULL, NULL) <= 0)
+        return NULL;
+    struct icmphdr *recv_hdr = (struct icmphdr *)(rbuffer + sizeof(struct iphdr));
+    // si il lit une erreur verifier que l'erreur est pour moi si non return
+    if (recv_hdr->un.echo.id == 0)
+    {
+        struct iphdr *error_ip = (struct iphdr *)(rbuffer + sizeof(struct icmphdr) + sizeof(struct iphdr));
+        struct icmphdr *error_icmp = (struct icmphdr *)(rbuffer + sizeof(struct icmphdr) + sizeof(struct iphdr) + (error_ip->ihl * 4));
+        if (!analyse_error(error_icmp, data))
+        // gerere ici l'erreur normal 
+        return "IP mdr";
+
+    }
+    // le paquet m'est pas destine, ou la loopback me troll
+    else if (recv_hdr->un.echo.id != data->id || recv_hdr->type == 8)
+        return NULL;
+    if ((recv_hdr->type == 0 && recv_hdr->code == 0))
+    {
+        printf("j'ai reussi\n");
+        *finish = true;
+        return NULL;
+    }
+    // print l'etoile quand a ca a rater
+    return NULL;
+}
 
 void ttl_loop(t_data *data)
 {
     bool finish = false;
     int ttl = 0;
     int nbr_of_queries;
+    char *ip = NULL;
+    (void)ip;
 
     // boucle sur le nombre d'essaie
     while (++ttl <= data->hope && !finish)
     {
         setup_socket(data, ttl);
+        // faire les prints pour le nombre le ttl en cours + l'ip reached
+
         // bouble sur le nombre de queries
         for (nbr_of_queries = 0; nbr_of_queries < data->queries; nbr_of_queries ++) 
         {
             send_ping(data);
-            // receive_ping();
+            ip = receive_ping(data, &finish);
+            // if (!nbr_of_queries)
+            //     print_ttl(ttl);
+            //     if (ip)
+            //         print_ip(ip);
             data->sequence ++;
         }
     }
