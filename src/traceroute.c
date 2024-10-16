@@ -92,6 +92,7 @@ void fill_icmp(t_ping_pkt *pckt, int sequence)
 void send_ping(t_data *data)
 {
     fill_icmp(&data->pckt, data->sequence);
+    clock_gettime(CLOCK_MONOTONIC, &data->time_loop_start);
     if (sendto(data->sockfd, &data->pckt, sizeof(t_ping_pkt), 0, (struct sockaddr *)&data->ping_addr, sizeof(data->ping_addr)) <= 0 )
         fatal_perror("Packet Sending Failed");
 }
@@ -115,34 +116,57 @@ bool analyse_error(struct icmphdr *error_icmp, t_data *data)
     return true;
 }
 
-char *receive_ping(t_data *data, bool *finish)
+void retrieve_ip(struct iphdr *ip_header, char *ip_str)
+{
+    struct in_addr ip_src;
+    ip_src.s_addr = ip_header->saddr;
+    if (inet_ntop(AF_INET, &ip_src, ip_str, INET_ADDRSTRLEN) == NULL)
+        fatal_perror("Inet_ntop");
+}
+
+double get_ms_response(t_data *data)
+{
+    struct timespec time_loop_end;
+
+    clock_gettime(CLOCK_MONOTONIC, &time_loop_end);
+    long sec_diff = time_loop_end.tv_sec - data->time_loop_start.tv_sec;
+    long nsec_diff = time_loop_end.tv_nsec - data->time_loop_start.tv_nsec;
+
+    if (nsec_diff < 0) {
+        sec_diff -= 1;
+        nsec_diff += 1000000000;
+    }
+    return (sec_diff * 1000.0 + (nsec_diff / 1000000.0));
+}
+
+double receive_ping(t_data *data, bool *finish, char *ip)
 {
     char rbuffer[128];
 
     if (recvfrom(data->sockfd, rbuffer, sizeof(rbuffer), 0, NULL, NULL) <= 0)
-        return NULL;
+        return NO_PKT;
     struct icmphdr *recv_hdr = (struct icmphdr *)(rbuffer + sizeof(struct iphdr));
+    struct iphdr *recv_ip_header = (struct iphdr *)(rbuffer);
     // si il lit une erreur verifier que l'erreur est pour moi si non return
     if (recv_hdr->un.echo.id == 0)
     {
         struct iphdr *error_ip = (struct iphdr *)(rbuffer + sizeof(struct icmphdr) + sizeof(struct iphdr));
         struct icmphdr *error_icmp = (struct icmphdr *)(rbuffer + sizeof(struct icmphdr) + sizeof(struct iphdr) + (error_ip->ihl * 4));
         if (!analyse_error(error_icmp, data))
-        // gerere ici l'erreur normal 
-        return "IP mdr";
-
+            return WRONG_PKT;
+        retrieve_ip(recv_ip_header, ip);
+        return get_ms_response(data);
     }
     // le paquet m'est pas destine, ou la loopback me troll
     else if (recv_hdr->un.echo.id != data->id || recv_hdr->type == 8)
-        return NULL;
+        return WRONG_PKT;
     if ((recv_hdr->type == 0 && recv_hdr->code == 0))
     {
-        printf("j'ai reussi\n");
+        retrieve_ip(recv_ip_header, ip);
         *finish = true;
-        return NULL;
+        return get_ms_response(data);
     }
-    // print l'etoile quand a ca a rater
-    return NULL;
+    return NO_PKT;
 }
 
 void ttl_loop(t_data *data)
@@ -150,8 +174,8 @@ void ttl_loop(t_data *data)
     bool finish = false;
     int ttl = 0;
     int nbr_of_queries;
-    char *ip = NULL;
-    (void)ip;
+    char ip[1025];
+    double ms;
 
     // boucle sur le nombre d'essaie
     while (++ttl <= data->hope && !finish)
@@ -162,14 +186,15 @@ void ttl_loop(t_data *data)
         // bouble sur le nombre de queries
         for (nbr_of_queries = 0; nbr_of_queries < data->queries; nbr_of_queries ++) 
         {
+            ms = WRONG_PKT;
+            memset(ip, 0, 1024);
             send_ping(data);
-            ip = receive_ping(data, &finish);
-            // if (!nbr_of_queries)
-            //     print_ttl(ttl);
-            //     if (ip)
-            //         print_ip(ip);
+            while (ms == WRONG_PKT)
+                ms = receive_ping(data, &finish, ip);
+            print_line(ttl, ip, ms, nbr_of_queries);
             data->sequence ++;
         }
+        printf("\n");
     }
 }
 
