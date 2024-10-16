@@ -32,7 +32,7 @@ bool fill_sockaddr_in(t_data *data, char *target)
         return true;
     }
     if (!dns_lookup(target, data->ip, &data->ping_addr))
-        fatal_error("ping: unknown host\n");
+        fatal_error("traceroute: unknown host\n");
     strncpy(data->domain, target, 499);
     return true;
 }
@@ -54,7 +54,7 @@ void init_data(t_data *data)
     data->queries = 3;
     data->sockfd = socket_creation();
     if (data->sockfd == -1)
-        fatal_error("ping: Lacking privilege for icmp socket.\n");
+        fatal_error("traceroute: Lacking privilege for icmp socket.\n");
     data->sequence = 0;
     data->id = getpid();
 }
@@ -148,7 +148,7 @@ double receive_ping(t_data *data, bool *finish, char *ip)
     struct icmphdr *recv_hdr = (struct icmphdr *)(rbuffer + sizeof(struct iphdr));
     struct iphdr *recv_ip_header = (struct iphdr *)(rbuffer);
     // si il lit une erreur verifier que l'erreur est pour moi si non return
-    if (recv_hdr->un.echo.id == 0)
+    if (recv_hdr->type == ICMP_TIME_EXCEEDED || recv_hdr->type == ICMP_DEST_UNREACH)
     {
         struct iphdr *error_ip = (struct iphdr *)(rbuffer + sizeof(struct icmphdr) + sizeof(struct iphdr));
         struct icmphdr *error_icmp = (struct icmphdr *)(rbuffer + sizeof(struct icmphdr) + sizeof(struct iphdr) + (error_ip->ihl * 4));
