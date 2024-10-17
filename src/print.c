@@ -38,3 +38,26 @@ void print_ip(char *ip)
 {
     printf("%s", ip);
 }
+
+void missing_host_operand(void)
+{
+    fatal_error("ft_traceroute: missing host operand\nTry 'ft_traceroute --help' for more information.\n");
+}
+
+void print_help(void)
+{
+    printf("Usage: ft_traceroute [OPTION...] HOST\n");
+    printf("Print the route packets trace to network host.\n\n");
+
+    printf("  --help           give this help list\n");
+    printf("  -q<NUM>          send NUM probe packets per hop (default: 3)\n");
+    printf("  -w<NUM>          wait NUM seconds for response (default: 1)\n");
+    exit(1);
+}
+
+void print_error_usage(char c)
+{
+    printf("ft_traceroute: invalid option -- '%c'\n\n", c);
+    printf("Try 'ft_traceroute --help' for more information.\n");
+    exit(3);
+}

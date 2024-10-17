@@ -2,5 +2,6 @@
 
 TODO
 
-- enlever le dafuck error
-- tester avec la loopback
+- enlever les fonctions interdites
+- bonus ? 
+- README

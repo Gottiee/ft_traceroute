@@ -18,7 +18,9 @@ SAN			= -fsanitize=address
 
 SRC_FILES = traceroute \
 error \
-print
+print \
+args \
+lib
 
 
 C_FILES		=	$(addsuffix .c, $(SRC_FILES))

@@ -5,7 +5,7 @@ bool dns_lookup(char *input_domain, char *ip, struct sockaddr_in *ping_addr)
     int value;
 
     struct addrinfo hints, *res;
-    memset(&hints, 0, sizeof(hints));
+    ft_memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     if ((value = getaddrinfo(input_domain, NULL, &hints, &res)) != 0)
@@ -15,25 +15,25 @@ bool dns_lookup(char *input_domain, char *ip, struct sockaddr_in *ping_addr)
     ping_addr->sin_family = AF_INET;
     ping_addr->sin_port = htons(0);
     ping_addr->sin_addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr;
-    strcpy(ip, inet_ntoa(ping_addr->sin_addr));
+    ft_strncpy(ip, inet_ntoa(ping_addr->sin_addr), 1024);
     freeaddrinfo(res);
     return true;
 }
 
 bool fill_sockaddr_in(t_data *data, char *target) 
 {
-    memset(&data->ping_addr, 0, sizeof(struct sockaddr_in));
+    ft_memset(&data->ping_addr, 0, sizeof(struct sockaddr_in));
 
     // tcheck si c'est une address ipv4
     if (inet_pton(AF_INET, target, &(data->ping_addr.sin_addr)) == 1) {
         data->ping_addr.sin_family = AF_INET;
         data->ping_addr.sin_port = htons(0);
-        strncpy(data->ip, target, 1024);
+        ft_strncpy(data->ip, target, 1024);
         return true;
     }
     if (!dns_lookup(target, data->ip, &data->ping_addr))
         fatal_error("traceroute: unknown host\n");
-    strncpy(data->domain, target, 499);
+    ft_strncpy(data->domain, target, 499);
     return true;
 }
 
@@ -47,8 +47,8 @@ int socket_creation()
 
 void init_data(t_data *data)
 {
-    memset(data->domain, 0, 500);
-    memset(data->ip, 0, 1025);
+    ft_memset(data->domain, 0, 500);
+    ft_memset(data->ip, 0, 1025);
     data->ttl = 1;
     data->hope = 64;
     data->queries = 3;
@@ -57,6 +57,7 @@ void init_data(t_data *data)
         fatal_error("traceroute: Lacking privilege for icmp socket.\n");
     data->sequence = 0;
     data->id = getpid();
+    data->recv_timeout = 1;
 }
 
 unsigned short checksum(void *b, int len)
@@ -92,7 +93,7 @@ void fill_icmp(t_ping_pkt *pckt, int sequence)
 void send_ping(t_data *data)
 {
     fill_icmp(&data->pckt, data->sequence);
-    clock_gettime(CLOCK_MONOTONIC, &data->time_loop_start);
+    gettimeofday(&data->time_loop_start, NULL);
     if (sendto(data->sockfd, &data->pckt, sizeof(t_ping_pkt), 0, (struct sockaddr *)&data->ping_addr, sizeof(data->ping_addr)) <= 0 )
         fatal_perror("Packet Sending Failed");
 }
@@ -100,7 +101,7 @@ void send_ping(t_data *data)
 void setup_socket(t_data *data, int ttl)
 {
     struct timeval tv_out;
-    tv_out.tv_sec = 1;
+    tv_out.tv_sec = data->recv_timeout;
     tv_out.tv_usec = 0;
     
     if (setsockopt(data->sockfd, SOL_IP, IP_TTL, &ttl, sizeof(ttl)) != 0)
@@ -126,17 +127,17 @@ void retrieve_ip(struct iphdr *ip_header, char *ip_str)
 
 double get_ms_response(t_data *data)
 {
-    struct timespec time_loop_end;
+    struct timeval time_loop_end;
+    gettimeofday(&time_loop_end, NULL);
 
-    clock_gettime(CLOCK_MONOTONIC, &time_loop_end);
     long sec_diff = time_loop_end.tv_sec - data->time_loop_start.tv_sec;
-    long nsec_diff = time_loop_end.tv_nsec - data->time_loop_start.tv_nsec;
+    long usec_diff = time_loop_end.tv_usec - data->time_loop_start.tv_usec;
 
-    if (nsec_diff < 0) {
+    if (usec_diff < 0) {
         sec_diff -= 1;
-        nsec_diff += 1000000000;
+        usec_diff += 1000000;
     }
-    return (sec_diff * 1000.0 + (nsec_diff / 1000000.0));
+    return (sec_diff * 1000.0 + usec_diff / 1000.0);
 }
 
 double receive_ping(t_data *data, bool *finish, char *ip)
@@ -172,22 +173,20 @@ double receive_ping(t_data *data, bool *finish, char *ip)
 void ttl_loop(t_data *data)
 {
     bool finish = false;
-    int ttl = 0;
+    int ttl = data->first_ttl;
     int nbr_of_queries;
     char ip[1025];
     double ms;
 
     // boucle sur le nombre d'essaie
-    while (++ttl <= data->hope && !finish)
+    while (ttl <= data->hope && !finish)
     {
         setup_socket(data, ttl);
-        // faire les prints pour le nombre le ttl en cours + l'ip reached
-
         // bouble sur le nombre de queries
         for (nbr_of_queries = 0; nbr_of_queries < data->queries; nbr_of_queries ++) 
         {
             ms = WRONG_PKT;
-            memset(ip, 0, 1024);
+            ft_memset(ip, 0, 1024);
             send_ping(data);
             while (ms == WRONG_PKT)
                 ms = receive_ping(data, &finish, ip);
@@ -195,17 +194,22 @@ void ttl_loop(t_data *data)
             data->sequence ++;
         }
         printf("\n");
+        ttl++;
     }
 }
 
 int main(int argc, char **argv)
 {
     t_data data;
+    char *host;
 
-    if (argc != 2)
-        fatal_error("ft_traceroute: missing host operand\nTry 'itraceroute --help' for more information.\n");
+    if (argc == 1)
+        missing_host_operand();
     init_data(&data);    
-    fill_sockaddr_in(&data, argv[1]);
+    host = handle_args(&argv[1], &data);
+    if (!host)
+        missing_host_operand();
+    fill_sockaddr_in(&data, host);
     print_header(&data);
     ttl_loop(&data);
     close(data.sockfd);
