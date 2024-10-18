@@ -173,13 +173,14 @@ double receive_ping(t_data *data, bool *finish, char *ip)
 void ttl_loop(t_data *data)
 {
     bool finish = false;
-    int ttl = data->first_ttl;
+    int ttl = data->ttl;
     int nbr_of_queries;
     char ip[1025];
     double ms;
+    int hope = 1;
 
     // boucle sur le nombre d'essaie
-    while (ttl <= data->hope && !finish)
+    while (hope <= data->hope && !finish)
     {
         setup_socket(data, ttl);
         // bouble sur le nombre de queries
@@ -190,11 +191,12 @@ void ttl_loop(t_data *data)
             send_ping(data);
             while (ms == WRONG_PKT)
                 ms = receive_ping(data, &finish, ip);
-            print_line(ttl, ip, ms, nbr_of_queries);
+            print_line(hope, ip, ms, nbr_of_queries);
             data->sequence ++;
         }
         printf("\n");
         ttl++;
+        hope++;
     }
 }
 
@@ -209,6 +211,7 @@ int main(int argc, char **argv)
     host = handle_args(&argv[1], &data);
     if (!host)
         missing_host_operand();
+    check_arg(&data);
     fill_sockaddr_in(&data, host);
     print_header(&data);
     ttl_loop(&data);

@@ -60,6 +60,7 @@ void print_error_usage(char c);
 
 /* args.c */
 char *handle_args(char **argv, t_data *data);
+void check_arg(t_data *data);
 
 /* lib.c */
 int	ft_strncmp(const char *s1, const char *s2, size_t n);

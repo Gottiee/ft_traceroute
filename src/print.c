@@ -49,9 +49,11 @@ void print_help(void)
     printf("Usage: ft_traceroute [OPTION...] HOST\n");
     printf("Print the route packets trace to network host.\n\n");
 
-    printf("  --help           give this help list\n");
-    printf("  -q<NUM>          send NUM probe packets per hop (default: 3)\n");
-    printf("  -w<NUM>          wait NUM seconds for response (default: 1)\n");
+    printf("  --help     give this help list\n");
+    printf("  -q<NUM>    send NUM probe packets per hop (default: 3)\n");
+    printf("  -w<NUM>    wait NUM seconds for response (default: 1)\n");
+    printf("  -f<NUM>    set initial hop distance, i.e., time-to-live\n");
+    printf("  -m<NUM>    set maximal hop count (default: 64)\n");
     exit(1);
 }
 

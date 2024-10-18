@@ -1,5 +1,14 @@
 #include "../inc/traceroute.h"
 
+void check_arg(t_data *data)
+{
+    if (data->ttl > 255)
+    {
+        printf("ft_traceroute: impossible distance `%d'\n", data->ttl);
+        exit(1);
+    }
+}
+
 void verify_next_number(char *arg, int size_arg)
 {
     int i = size_arg - 1;
@@ -35,6 +44,10 @@ char handle_options(char *arg, t_data *data)
             return numeric_option(arg, 1, &data->queries, true);
         else if (*arg == 'w')
             return numeric_option(arg, 1, &data->recv_timeout, true);
+        else if (*arg == 'f')
+            return numeric_option(arg, 1, &data->ttl, true);
+        else if (*arg == 'm')
+            return numeric_option(arg, 1, &data->hope, true);
         // else if (*arg == '?')
         //     print_option();
         // else if (*arg == 'c')
